@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><style>:root{box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>USD/INR Master Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: a dealing-desk ledger. Masthead with a live-level strip, sticky tab rail, then one working surface per tab. */
+:root{
+  --bg:#eef1ee; --surface:#fbfcfa; --sunk:#f3f6f3; --ink:#15211f; --muted:#5b6a66; --line:#d6ddd8; --line2:#e7ece8;
+  --accent:#0b5d6e; --accent-soft:#dcebed; --crude:#9c5c12; --crude-soft:#f4e6d2;
+  --usd:#b3261e; --usd-soft:#f8e1de; --inr:#1d7446; --inr-soft:#dcf0e3; --watch:#8a6100; --watch-soft:#f6ecd0;
+  --s1:#0077a3; --s2:#b86e12; --s3:#7050b0; --grid:#e3e8e4;
+  --f-display:'Familjen Grotesk','Public Sans',system-ui,sans-serif;
+  --f-body:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  --r:10px; --shadow:0 1px 2px rgba(20,33,31,.06),0 6px 18px rgba(20,33,31,.05);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1413; --surface:#151d1c; --sunk:#111918; --ink:#e2ebe7; --muted:#95a6a1; --line:#2a3634; --line2:#212c2a;
+  --accent:#5bb8c9; --accent-soft:#17343a; --crude:#e0a45c; --crude-soft:#3a2a15;
+  --usd:#f07a70; --usd-soft:#3b1d1b; --inr:#5dc48c; --inr-soft:#163223; --watch:#e3b852; --watch-soft:#352b12;
+  --s1:#1f9bb8; --s2:#c47f30; --s3:#9272d6; --grid:#243230; --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1413; --surface:#151d1c; --sunk:#111918; --ink:#e2ebe7; --muted:#95a6a1; --line:#2a3634; --line2:#212c2a;
+  --accent:#5bb8c9; --accent-soft:#17343a; --crude:#e0a45c; --crude-soft:#3a2a15;
+  --usd:#f07a70; --usd-soft:#3b1d1b; --inr:#5dc48c; --inr-soft:#163223; --watch:#e3b852; --watch-soft:#352b12;
+  --s1:#1f9bb8; --s2:#c47f30; --s3:#9272d6; --grid:#243230; --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1320px;margin:0 auto;padding:0 20px 64px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+.num,td.num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+
+/* masthead */
+.mast{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;padding:22px 0 14px}
+.mast h1{font-size:30px;font-weight:700;letter-spacing:-.01em;line-height:1}
+.mast .kicker{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.mode{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--muted)}
+.dot.on{background:var(--inr)}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.q{background:var(--surface);padding:10px 14px;min-width:0}
+.q .lab{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:6px}
+.q .lvl{font-family:var(--f-mono);font-size:21px;font-weight:600;line-height:1.25}
+.q .chg{font-family:var(--f-mono);font-size:12px}
+.q.oil .lab{color:var(--crude)}
+.up{color:var(--usd)} .dn{color:var(--inr)} .flat{color:var(--muted)}
+.asof{font-size:11px;color:var(--muted);margin:6px 2px 0;font-family:var(--f-mono)}
+
+/* tabs */
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);
+  display:flex;gap:2px;overflow-x:auto;padding:10px 0;margin:14px 0 20px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+nav.tabs button{border:0;background:none;color:var(--muted);font-weight:600;font-size:13px;padding:8px 13px;border-radius:7px;white-space:nowrap}
+nav.tabs button:hover{background:var(--accent-soft);color:var(--ink)}
+nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+nav.tabs button.oiltab{color:var(--crude)}
+nav.tabs button.oiltab[aria-selected="true"]{background:var(--crude);color:var(--bg)}
+
+section.tab{display:none} section.tab.show{display:block}
+.sechead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:10px;margin:26px 0 10px;border-bottom:1px solid var(--ink);padding-bottom:6px}
+.sechead:first-child{margin-top:0}
+.sechead h2{font-size:21px;font-weight:600}
+.sechead .sub{color:var(--muted);font-size:12.5px}
+.lede{color:var(--muted);font-size:13px;max-width:78ch;margin:0 0 14px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.grid>*{min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow);min-width:0}
+.card h3{font-size:14px;font-weight:600;letter-spacing:.02em;margin-bottom:8px}
+.card.oil{border-top:3px solid var(--crude)}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.big{font-family:var(--f-mono);font-size:30px;font-weight:600;line-height:1.1}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);background:var(--sunk);white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid var(--line2);vertical-align:top;font-size:13px}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;white-space:nowrap}
+td.idx{color:var(--muted);font-family:var(--f-mono);width:30px}
+.fac{font-weight:600}
+
+/* pills */
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;line-height:1.5;white-space:normal}
+.pill.usd{color:var(--usd);background:var(--usd-soft)}
+.pill.inr{color:var(--inr);background:var(--inr-soft)}
+.pill.neutral{color:var(--watch);background:var(--watch-soft)}
+.pill.crude{color:var(--crude);background:var(--crude-soft)}
+.pill.plain{color:var(--muted);background:var(--sunk);border:1px solid var(--line)}
+.tilt-bar{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--inr-soft),var(--sunk) 50%,var(--usd-soft));border:1px solid var(--line)}
+.tilt-bar i{position:absolute;top:-4px;width:3px;height:16px;border-radius:2px;background:var(--ink)}
+.tilt-bar b{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--muted)}
+.tilt-legend{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px}
+
+.netread{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13.5px;max-width:95ch}
+.netread.oil{border-color:var(--crude);background:var(--crude-soft)}
+
+/* session cards */
+.sess{margin-bottom:22px}
+.sess-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:8px}
+.sess-head .d{font-family:var(--f-display);font-size:18px;font-weight:600}
+.badge{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);background:var(--surface);padding:2px 8px;border-radius:4px;color:var(--muted)}
+.kv{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;margin:0 0 10px}
+.kv span b{font-family:var(--f-mono);font-weight:600}
+.kv span{color:var(--muted)} .kv span b{color:var(--ink)}
+.conf{display:inline-flex;gap:2px;vertical-align:middle}
+.conf i{width:6px;height:10px;border-radius:1px;background:var(--line)}
+.conf i.f{background:var(--accent)}
+
+/* buttons */
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--bg);font-weight:600;font-size:12.5px;padding:7px 13px;border-radius:7px}
+.btn:hover{background:var(--accent);border-color:var(--accent)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{background:var(--accent-soft)}
+.btn.danger{background:transparent;color:var(--usd);border-color:var(--usd)}
+.btn.crude{background:var(--crude);border-color:var(--crude)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.ic{border:1px solid var(--line);background:var(--surface);color:var(--ink);width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.ic:hover{background:var(--accent-soft)}
+.ic.del{color:var(--usd)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+body.ro .w{display:none!important}
+.roflag{display:none;font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:6px 10px;margin-bottom:12px}
+body.ro .roflag{display:block}
+
+/* fields */
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;color:var(--muted)}
+input,select,textarea{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;min-width:0}
+textarea{min-height:70px;resize:vertical}
+input[type=range]{padding:0;accent-color:var(--accent)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:10px}
+.fgrid .full{grid-column:1/-1}
+
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(10,18,17,.5);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) 16px 24px;overflow:auto}
+.ov[hidden]{display:none!important}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:12px;width:100%;max-width:760px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal h3{font-size:19px;margin-bottom:12px}
+.mact{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+.rrows{display:flex;flex-direction:column;gap:8px}
+.rrow{display:grid;gap:6px;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr)) 30px;align-items:start;padding:8px;border:1px solid var(--line2);border-radius:8px;background:var(--sunk)}
+.warnbox{border:1px solid var(--usd);background:var(--usd-soft);color:var(--ink);border-radius:8px;padding:10px 12px;font-size:12.5px;margin-top:12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:13px;z-index:200;max-width:90vw}
+
+/* charts */
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;overflow:visible}
+.chart .tt{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;box-shadow:var(--shadow);white-space:nowrap;font-family:var(--f-mono)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+.empty{color:var(--muted);font-style:italic;font-size:13px;padding:10px 0}
+
+/* events */
+.ev{display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-bottom:7px}
+.ev .d{font-family:var(--f-mono);font-weight:600;font-size:12.5px}
+.ev small{display:block;color:var(--muted);font-size:12px}
+.ev.done{opacity:.6}
+@media(max-width:560px){.ev{grid-template-columns:1fr}}
+
+/* prob bar */
+.prob{display:flex;height:22px;border-radius:6px;overflow:hidden;gap:2px;margin:6px 0 10px}
+.prob div{display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:11px;font-weight:600;color:var(--bg);min-width:0;overflow:hidden}
+.prob .pu{background:var(--usd)} .prob .pb{background:var(--muted)} .prob .pi{background:var(--inr)}
+
+.prompt{font-family:var(--f-mono);font-size:12px;white-space:pre-wrap;word-break:break-word;background:var(--sunk);border:1px solid var(--line2);border-radius:8px;padding:12px;max-height:300px;overflow:auto;margin:8px 0 0}
+.ind-sel{width:auto;font-size:12px;padding:3px 6px}
+.ind-sel.buy{color:var(--usd);border-color:var(--usd)} .ind-sel.sell{color:var(--inr);border-color:var(--inr)}
+.gauge{position:relative;height:14px;border-radius:7px;background:linear-gradient(90deg,var(--inr-soft),var(--sunk),var(--usd-soft));border:1px solid var(--line);overflow:hidden}
+.gauge .fill{position:absolute;top:0;bottom:0;opacity:.55}
+.gauge .mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--ink)}
+.disclaimer{font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);margin-top:36px;padding-top:12px;max-width:100ch}
+body.noask #askCard{display:none}
+.ask-out{white-space:pre-wrap;font-size:13.5px;margin-top:10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head><body>
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <div class="kicker">Institutional FX &amp; crude research · importer desk</div>
+      <h1>USD/INR Master Tracker</h1>
+    </div>
+    <div class="mode" id="modeLine"><span class="dot" id="modeDot"></span><span id="modeText">Connecting…</span></div>
+  </header>
+  <div class="strip" id="strip"></div>
+  <div class="asof" id="stripAsof"></div>
+
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <div class="roflag">Published view. It refreshes on its own after each morning, evening and weekly research run.</div>
+
+  <section class="tab" id="t-overview"></section>
+  <section class="tab" id="t-sessions"></section>
+  <section class="tab" id="t-oil"></section>
+  <section class="tab" id="t-indexes"></section>
+  <section class="tab" id="t-drivers"></section>
+  <section class="tab" id="t-outlook"></section>
+  <section class="tab" id="t-calendar"></section>
+  <section class="tab" id="t-history"></section>
+  <section class="tab" id="t-signal"></section>
+  <section class="tab" id="t-technical"></section>
+  <section class="tab" id="t-prompts"></section>
+  <section class="tab" id="t-data"></section>
+
+  <p class="disclaimer">Levels are research records compiled from public sources; "est." marks indicative figures pending the RBI reference rate or settlement. Scenario probabilities are analytical judgements, not guarantees. Colour key: <b style="color:var(--usd)">red</b> = USD/INR higher (rupee weaker), <b style="color:var(--inr)">green</b> = USD/INR lower (rupee firmer), <b style="color:var(--watch)">amber</b> = mixed or watch. Not financial advice.</p>
+</div>
+
+<div class="ov" id="ov" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <h3 id="mTitle"></h3><div id="mBody"></div><div id="mWarn"></div>
+  <div class="mact" id="mAct"></div>
+</div></div>
+
+<script>
+/* ================= state & store ================= */
+const S={sessions:[],history:[],oil:[],events:[],signals:[],techlog:[],prompts:[],standing:null,indexes:null,indicators:null,status:null};
+const COLLS=['sessions','history','oil','events','signals','techlog','prompts'];
+const DOCS={standing:'config/standing',indexes:'config/indexes',indicators:'config/indicators',status:'config/status'};
+let DB=null, CAN=true, MODE='init', SAMPLE=null, DL=null, TAB='overview', loaded=0;
+const LSKEY='usdinr_master_v3';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const num=v=>{if(v==null)return null;if(typeof v==='number')return isFinite(v)?v:null;const m=String(v).replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);return m?parseFloat(m[0]):null};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3200)}
+function lsGet(){try{return JSON.parse(localStorage.getItem(LSKEY)||'null')}catch(e){return null}}
+function lsPut(){if(MODE!=='local')return;try{localStorage.setItem(LSKEY,JSON.stringify(S))}catch(e){}}
+
+async function save(coll,id,obj){
+  obj={...obj,id};
+  if(DB){try{await DB.collection(coll).doc(id).set(obj)}catch(e){fail(e);throw e}}
+  else{const a=S[coll];const i=a.findIndex(x=>x.id===id);if(i>=0)a[i]=obj;else a.push(obj);lsPut();sched()}
+}
+async function del(coll,id){
+  if(DB){try{await DB.collection(coll).doc(id).delete()}catch(e){fail(e)}}
+  else{S[coll]=S[coll].filter(x=>x.id!==id);lsPut();sched()}
+}
+async function saveDoc(key,obj){
+  if(DB){try{await DB.doc(DOCS[key]).set(obj)}catch(e){fail(e);throw e}}
+  else{S[key]=obj;lsPut();sched()}
+}
+function fail(e){const c=e&&e.code;
+  if(c==='invalid_argument'){CAN=false;document.body.classList.add('ro');toast('This view can read the tracker but not change it.')}
+  else if(c==='quota_exceeded')toast('Storage is full. Delete old records (Data tab) and try again.');
+  else toast('Could not save: '+((e&&e.message)||'network error'))}
+let _rq=0;function sched(){cancelAnimationFrame(_rq);_rq=requestAnimationFrame(render)}
+
+/* ================= helpers ================= */
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtD(iso){if(!iso)return'—';const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return iso;return `${+m[3]} ${MON[+m[2]-1]} ${m[1]}`}
+function dts(iso){const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?Date.UTC(+m[1],+m[2]-1,+m[3]):null}
+function todayISO(){const d=new Date();return d.toISOString().slice(0,10)}
+const SORD={'pre-open':0,'morning':1,'midday':2,'full session':3,'evening':4,'weekly':5};
+function sRank(s){s=String(s||'').toLowerCase();for(const k in SORD)if(s.startsWith(k))return SORD[k];return 3}
+function sessionsSorted(){return [...S.sessions].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||sRank(b.session)-sRank(a.session))}
+function histSorted(){return [...S.history].filter(h=>h.date).sort((a,b)=>a.date.localeCompare(b.date))}
+function tiltOf(t){t=String(t||'').toLowerCase();
+  if(['usd','inr','neutral'].includes(t))return t;
+  if(/reversing|mixed|neutral|pending|watch|two-way/.test(t))return 'neutral';
+  if(/positive|offsetting|bullish inr|bearish usd|supportive|firmer|stronger/.test(t))return 'inr';
+  if(/negative|bearish|bullish usd|weaker/.test(t))return 'usd';return 'neutral'}
+const TLAB={usd:'USD bias · rupee weaker',inr:'INR bias · rupee firmer',neutral:'Neutral / watch'};
+function pill(text,t){return `<span class="pill ${t||tiltOf(text)}">${esc(text)}</span>`}
+function confDots(c){const n=Math.round(num(c)||0);let h='<span class="conf" title="Confidence '+n+'/10">';for(let i=1;i<=10;i++)h+=`<i class="${i<=n?'f':''}"></i>`;return h+'</span>'}
+function idx(k){const it=(S.indexes&&S.indexes.items)||[];return it.find(x=>x.k===k)}
+function chg(it){const l=num(it&&it.level),p=num(it&&it.prev);if(l==null||p==null||p===0)return null;return {d:l-p,pct:(l-p)/p*100}}
+function srcLink(f){if(!f.src&&!f.url)return'—';return f.url?`<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.src||'source')}</a>`:esc(f.src)}
+function acts(edit,delc){return `<span class="w" style="display:inline-flex;gap:4px"><button class="ic" title="Edit" onclick="${edit}">✎</button>${delc?`<button class="ic del" title="Delete" onclick="${delc}">×</button>`:''}</span>`}
+function secHead(t,sub,right){return `<div class="sechead"><h2>${t}</h2><span class="sub">${sub||''}</span>${right||''}</div>`}
+function emptyMsg(t){return `<p class="empty">${t}</p>`}
+
+/* ================= charts ================= */
+const CHARTS=[];
+function lineChart(id,series,o={}){CHARTS.push({id,series,o});return `<div class="chart" id="${id}"></div>`}
+function drawCharts(){CHARTS.splice(0).forEach(c=>{const el=document.getElementById(c.id);if(el)paint(el,c.series,c.o)})}
+function paint(el,series,o){
+  series=series.map(s=>({...s,pts:s.pts.filter(p=>p[1]!=null&&isFinite(p[1])&&p[0]!=null).sort((a,b)=>a[0]-b[0])})).filter(s=>s.pts.length);
+  if(!series.length){el.innerHTML=emptyMsg(o.empty||'No data yet — add rows in History.');return}
+  const W=Math.max(260,el.clientWidth||600),H=o.h||190,L=48,R=o.rpad||58,T=12,B=26;
+  const all=series.flatMap(s=>s.pts);let xs=all.map(p=>p[0]),ys=all.map(p=>p[1]);
+  let x0=Math.min(...xs),x1=Math.max(...xs);if(x0===x1){x0-=864e5;x1+=864e5}
+  let y0=Math.min(...ys),y1=Math.max(...ys);const pad=(y1-y0)*.12||Math.abs(y1)*.01||1;y0-=pad;y1+=pad;
+  const step=nice((y1-y0)/4);y0=Math.floor(y0/step)*step;y1=Math.ceil(y1/step)*step;
+  const X=v=>L+(v-x0)/(x1-x0)*(W-L-R),Y=v=>T+(1-(v-y0)/(y1-y0))*(H-T-B);
+  const dec=o.dec??2,f=v=>(o.pre||'')+v.toFixed(dec)+(o.suf||'');
+  let g='';for(let v=y0;v<=y1+step/2;v+=step){g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="10.5" fill="var(--muted)" font-family="var(--f-mono)">${v.toFixed(step<1?(step<.1?2:1):0)}</text>`}
+  const ticks=[x0,x0+(x1-x0)/2,x1];ticks.forEach((t,i)=>{const d=new Date(t);g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i===0?'start':i===2?'end':'middle'}" font-size="10.5" fill="var(--muted)">${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}</text>`});
+  let lines='';series.forEach(s=>{let d='',prev=null;s.pts.forEach(p=>{const gap=prev&&(p[0]-prev[0])>20*864e5;d+=(prev&&!gap?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1);prev=p});
+    lines+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(s.pts.length<=45)s.pts.forEach(p=>lines+=`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="2.6" fill="${s.color}" stroke="var(--surface)" stroke-width="1"/>`);
+    const e=s.pts[s.pts.length-1];lines+=`<circle cx="${X(e[0])}" cy="${Y(e[1])}" r="4.5" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/><text x="${X(e[0])+8}" y="${Y(e[1])+4}" font-size="11" font-weight="600" fill="var(--ink)" font-family="var(--f-mono)">${f(e[1])}</text>`});
+  const legend=series.length>1?`<div class="legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}</div>`:'';
+  el.innerHTML=legend+`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(o.label||series.map(s=>s.name).join(', '))}">${g}${lines}<line class="xh" x1="0" x2="0" y1="${T}" y2="${H-B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/><rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/></svg><div class="tt" hidden></div>`;
+  const svg=el.querySelector('svg'),tt=el.querySelector('.tt'),xh=el.querySelector('.xh');
+  const dates=[...new Set(all.map(p=>p[0]))].sort((a,b)=>a-b);
+  svg.addEventListener('pointermove',ev=>{const r=svg.getBoundingClientRect();const px=(ev.clientX-r.left)*(W/r.width);
+    let best=dates[0];dates.forEach(d=>{if(Math.abs(X(d)-px)<Math.abs(X(best)-px))best=d});
+    xh.setAttribute('x1',X(best));xh.setAttribute('x2',X(best));xh.setAttribute('visibility','visible');
+    const dd=new Date(best);let h=`<div style="color:var(--muted)">${dd.getUTCDate()} ${MON[dd.getUTCMonth()]} ${dd.getUTCFullYear()}</div>`;
+    series.forEach(s=>{const p=s.pts.find(q=>q[0]===best);if(p)h+=`<div><span style="color:${s.color}">●</span> ${esc(s.name)}: <b>${f(p[1])}</b></div>`});
+    tt.innerHTML=h;tt.hidden=false;const left=X(best)/W*r.width;tt.style.left=Math.min(Math.max(0,left+10),r.width-tt.offsetWidth)+'px';tt.style.top=(legend?24:0)+'px'});
+  svg.addEventListener('pointerleave',()=>{tt.hidden=true;xh.setAttribute('visibility','hidden')});
+}
+function nice(x){const e=Math.pow(10,Math.floor(Math.log10(x)));const f=x/e;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*e}
+let _rz;addEventListener('resize',()=>{clearTimeout(_rz);_rz=setTimeout(sched,200)});
+
+/* ================= modal / forms ================= */
+let FORM=null;
+function openForm(cfg){FORM={...cfg,ack:false};$('#mTitle').textContent=cfg.title;$('#mWarn').innerHTML='';
+  $('#mBody').innerHTML=(cfg.intro?`<p class="lede">${cfg.intro}</p>`:'')+`<div class="fgrid">${cfg.fields.map(f=>fieldHTML(f,cfg.vals||{})).join('')}</div>`;
+  $('#mAct').innerHTML=(cfg.onDelete?`<button class="btn danger" style="margin-right:auto" onclick="formDel()">Delete</button>`:'')+`<button class="btn ghost" onclick="closeForm()">Cancel</button><button class="btn" id="mSave" onclick="formSave()">${cfg.saveLabel||'Save'}</button>`;
+  $('#ov').hidden=false;setTimeout(()=>{const i=$('#mBody input,#mBody textarea,#mBody select');if(i)i.focus()},30)}
+function closeForm(){$('#ov').hidden=true;FORM=null}
+addEventListener('keydown',e=>{if(e.key==='Escape'&&FORM)closeForm()});
+function optList(f,v){let o=f.o||[];if(v&&!o.some(x=>(x.v??x)===v))o=[...o,v];return o.map(x=>{const val=x.v??x,lab=x.l??x;return `<option value="${esc(val)}"${val===v?' selected':''}>${esc(lab)}</option>`}).join('')}
+function inputHTML(f,v,id){const a=`id="${id}" data-k="${f.k}"`;
+  if(f.t==='area')return `<textarea ${a} rows="${f.rows||3}">${esc(v)}</textarea>`;
+  if(f.t==='sel')return `<select ${a}>${optList(f,v)}</select>`;
+  if(f.t==='chk')return `<input type="checkbox" ${a} ${v?'checked':''} style="width:auto">`;
+  return `<input ${a} type="${f.t==='date'?'date':f.t==='num'?'number':'text'}" ${f.t==='num'?'step="any"':''} value="${esc(v)}" placeholder="${esc(f.ph||'')}">`}
+function fieldHTML(f,vals){const v=vals[f.k]??f.def??'';
+  if(f.t==='rows'){const rows=Array.isArray(v)?v:[];return `<div class="field full"><label>${f.l}</label><div class="rrows" id="rr_${f.k}">${rows.map(r=>rowHTML(f,r)).join('')}</div><button type="button" class="btn ghost" style="align-self:flex-start;margin-top:6px" onclick="addRow('${f.k}')">+ Add ${f.one||'row'}</button></div>`}
+  return `<div class="field ${f.t==='area'||f.full?'full':''}"><label for="f_${f.k}">${f.l}</label>${inputHTML(f,v,'f_'+f.k)}</div>`}
+function rowHTML(f,r){return `<div class="rrow">${f.cols.map(c=>`<div class="field ${c.t==='area'?'full':''}"><label>${c.l}</label>${inputHTML(c,r[c.k]??c.def??'','')}</div>`).join('')}<button type="button" class="ic del" title="Remove" onclick="this.parentNode.remove()">×</button></div>`}
+function addRow(k){const f=FORM.fields.find(x=>x.k===k);document.getElementById('rr_'+k).insertAdjacentHTML('beforeend',rowHTML(f,{}))}
+function readInput(el,f){if(f.t==='chk')return el.checked;const v=el.value.trim();if(f.t==='num')return v===''?null:parseFloat(v);return v}
+function formVals(){const out={};FORM.fields.forEach(f=>{
+  if(f.t==='rows'){out[f.k]=[...document.querySelectorAll('#rr_'+f.k+' .rrow')].map(r=>{const o={};f.cols.forEach(c=>{const el=r.querySelector(`[data-k="${c.k}"]`);o[c.k]=readInput(el,c)});return o}).filter(o=>Object.values(o).some(x=>x!==''&&x!=null))}
+  else{const el=document.getElementById('f_'+f.k);out[f.k]=readInput(el,f)}});return out}
+async function formSave(){const v=formVals();
+  if(FORM.req){for(const k of FORM.req)if(!v[k]){$('#mWarn').innerHTML=`<div class="warnbox">Fill in <b>${esc(FORM.fields.find(f=>f.k===k).l)}</b> before saving.</div>`;return}}
+  if(FORM.check&&!FORM.ack){const w=FORM.check(v);if(w.length){FORM.ack=true;$('#mWarn').innerHTML=`<div class="warnbox"><b>Rate integrity check</b><ol style="margin:6px 0 0;padding-left:18px">${w.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>Check the figures, or save anyway.</div>`;$('#mSave').textContent='Save anyway';return}}
+  const b=$('#mSave');b.disabled=true;try{await FORM.onSave(v);closeForm();toast('Saved')}catch(e){b.disabled=false}}
+function formDel(){const f=FORM;$('#mWarn').innerHTML=`<div class="warnbox">Delete this record for good? <button class="btn danger" style="margin-left:8px" id="mDelYes">Yes, delete</button></div>`;
+  $('#mDelYes').onclick=async()=>{await f.onDelete();closeForm();toast('Deleted')}}
+function confirmBox(title,msg,yes,fn){openForm({title,fields:[],intro:msg,saveLabel:yes,onSave:async()=>{await fn()}})}
+
+/* ================= tabs ================= */
+const TABS=[['overview','Overview'],['sessions','Sessions & Matrix'],['oil','Oil Market'],['indexes','Indexes'],['drivers','Drivers'],['outlook','Outlook & Ranges'],['calendar','Calendar'],['history','History & Charts'],['signal','Cover Signal'],['data','Data & Export']];
+$('#tabs').innerHTML=TABS.map(([k,l])=>`<button role="tab" data-t="${k}" class="${k==='oil'?'oiltab':''}" aria-selected="${k===TAB}">${l}</button>`).join('');
+$('#tabs').addEventListener('click',e=>{const t=e.target.dataset.t;if(t){TAB=t;try{sessionStorage.setItem('usdinr_tab',t)}catch(_){ }render();scrollTo({top:0})}});
+try{const h=location.hash.slice(1);if(TABS.some(x=>x[0]===h))TAB=h;else{const s=sessionStorage.getItem('usdinr_tab');if(s)TAB=s}}catch(e){}
+
+/* ================= strip ================= */
+const STRIP=['usdinr','brent','wti','dxy','us10y','gold'];
+function renderStrip(){const it=STRIP.map(idx).filter(Boolean);
+  $('#strip').innerHTML=it.length?it.map(x=>{const c=chg(x);const oil=x.group==='Energy';
+    const cls=c?(c.d>0?'up':c.d<0?'dn':'flat'):'flat';
+    return `<div class="q ${oil?'oil':''}"><div class="lab"><span>${esc(x.name)}</span><span>${esc(x.unit||'')}</span></div><div class="lvl">${esc(x.level)}</div><div class="chg ${cls}">${c?(c.d>0?'▲ +':c.d<0?'▼ ':'')+c.d.toFixed(Math.abs(c.d)<1?3:2)+' ('+(c.pct>0?'+':'')+c.pct.toFixed(2)+'%)':'—'}</div></div>`}).join('')
+   :`<div class="q"><div class="lab">Market levels</div><div class="empty">No index levels yet. Add them in the Indexes tab.</div></div>`;
+  $('#stripAsof').textContent=S.indexes&&S.indexes.asof?'Levels as of '+S.indexes.asof+' · recorded, not streaming. Change colours: red = move that pressures the rupee.':'';}
+
+/* ================= OVERVIEW ================= */
+function driverTilt(){const d=(S.standing&&S.standing.drivers)||[];let s=0,w=0;d.forEach(x=>{const wt=num(x.weight)||5;const t=tiltOf(x.tilt||x.bias);s+=wt*(t==='usd'?1:t==='inr'?-1:0);w+=wt});return w?s/w:0}
+function tiltBar(v){const p=50+v*50;return `<div class="tilt-bar"><b></b><i style="left:calc(${p}% - 1.5px)"></i></div><div class="tilt-legend"><span>Rupee firmer</span><span>Balanced</span><span>Rupee weaker</span></div>`}
+function renderOverview(){
+  const ss=sessionsSorted(),s=ss[0],h=histSorted();
+  const brent=idx('brent'),wti=idx('wti'),inr=idx('usdinr');
+  const rpb=num(brent&&brent.level)!=null&&num(inr&&inr.level)!=null?num(brent.level)*num(inr.level):null;
+  const lastOil=[...S.oil].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
+  const evs=S.events.filter(e=>!e.done).sort((a,b)=>(a.sort||'9').localeCompare(b.sort||'9')).slice(0,5);
+  const dt=driverTilt();
+  let html=secHead('Desk summary',s?`Latest session: ${fmtD(s.date)} · ${esc(s.session)}`:'');
+  const st=S.status;if(st&&st.lastRun)html+=`<div class="netread" style="margin-bottom:14px;border-color:var(--inr);background:var(--inr-soft)"><b>Automatic updates on.</b> Last run ${esc(st.lastRun)} (${esc(st.kind||'')}). ${esc(st.summary||'')} ${st.next?'Next: '+esc(st.next)+'.':''}</div>`;
+  html+=`<div class="grid g2">`;
+  html+=s?`<div class="card"><div class="eyebrow">Market bias</div><div style="margin:6px 0 10px">${pill(s.bias||TLAB[s.tilt],tiltOf(s.tilt||s.bias))}</div>
+    <div class="kv"><span>Open / prior <b>${esc(s.open||'—')}</b></span><span>Close <b>${esc(s.close||'—')}</b></span><span>Range <b>${esc([s.low,s.high].filter(Boolean).join(' – ')||'—')}</b></span><span>Confidence ${confDots(s.conf)} <b>${esc(s.conf??'—')}/10</b></span></div>
+    <div class="kv"><span>Support <b>${esc(s.supports||'—')}</b></span><span>Resistance <b>${esc(s.resistances||'—')}</b></span></div>
+    <div class="netread">${esc(s.net||'No net read recorded.')}</div></div>`
+   :`<div class="card"><h3>No sessions yet</h3><p class="lede">Log your first morning or evening session in <b>Sessions &amp; Matrix</b>, or import your old tracker's backup in <b>Data &amp; Export</b>.</p><button class="btn w" onclick="editSession()">+ Add session</button></div>`;
+  html+=`<div class="card oil"><div class="eyebrow" style="color:var(--crude)">Oil pulse</div>
+    <div class="grid g3" style="gap:10px;margin:8px 0">
+      <div><div class="eyebrow">Brent</div><div class="big">${esc(brent?brent.level:'—')}</div></div>
+      <div><div class="eyebrow">WTI</div><div class="big">${esc(wti?wti.level:'—')}</div></div>
+      <div><div class="eyebrow">₹ per barrel</div><div class="big">${rpb?'₹'+Math.round(rpb).toLocaleString('en-IN'):'—'}</div></div></div>
+    ${S.standing&&S.standing.oil&&S.standing.oil.tilt?`<div style="margin-bottom:8px">${pill(S.standing.oil.tilt,'crude')}</div>`:''}
+    ${lastOil?`<div style="font-size:13px"><b>${fmtD(lastOil.date)}</b> · ${esc(lastOil.headline)}</div>`:emptyMsg('No oil headlines logged yet.')}</div>`;
+  html+=`</div>`;
+  html+=`<div class="grid g3" style="margin-top:16px">
+    <div class="card"><h3>Weighted driver tilt</h3>${tiltBar(dt)}<p class="lede" style="margin:8px 0 0">${(S.standing&&S.standing.drivers||[]).length} drivers, weighted by importance. Score ${(dt*100).toFixed(0)} on a −100 (rupee firmer) to +100 (rupee weaker) scale.</p></div>
+    <div class="card"><h3>Next on the calendar</h3>${evs.length?evs.map(e=>`<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--line2)"><span class="mono" style="min-width:86px;font-size:12px;font-weight:600">${esc(e.date)}</span><span style="font-size:13px">${esc(e.event)}</span></div>`).join(''):emptyMsg('Nothing scheduled.')}</div>
+    <div class="card"><h3>Latest factors</h3>${s&&s.factors&&s.factors.length?s.factors.slice(0,5).map(f=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line2)"><span style="font-size:13px;font-weight:600">${esc(f.f)}</span>${pill(f.ef,tiltOf(f.ef))}</div>`).join(''):emptyMsg('No factor rows yet.')}</div></div>`;
+  html+=`<div class="grid g2" style="margin-top:16px"><div class="card"><h3>USD/INR close</h3>${lineChart('ovInr',[{name:'USD/INR',color:'var(--s1)',pts:h.map(r=>[dts(r.date),num(r.usdinr_c)])}],{dec:2})}</div>
+    <div class="card oil"><h3>Brent futures close, $/bbl</h3>${lineChart('ovBrent',[{name:'Brent',color:'var(--s2)',pts:h.map(r=>[dts(r.date),num(r.brent_c)])}],{dec:2,pre:'$'})}</div></div>`;
+  html+=`<div class="card" style="margin-top:16px" id="askCard"><h3>Ask the desk</h3><p class="lede" style="margin-bottom:8px">Claude reads the tracker's current records (latest sessions, indexes, drivers, oil log, outlook) and answers. Uses your Claude allowance.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="askQ" placeholder="e.g. Draft a net read for tomorrow's open, or: how exposed is the rupee if Brent goes back to $105?" style="flex:1;min-width:220px"><button class="btn" onclick="ask()">Ask</button><button class="btn ghost" onclick="ask('Write a 120-word net read for the next session: bias, confidence, key levels, and what an importer should do. Base it only on the records.')">Draft net read</button></div><div class="ask-out" id="askOut"></div></div>`;
+  return html}
+function ctxForAI(){const ss=sessionsSorted().slice(0,3);return JSON.stringify({today:todayISO(),sessions:ss,indexes:S.indexes,standing:S.standing,oil:[...S.oil].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10),history:histSorted().slice(-15),events:S.events.filter(e=>!e.done)})}
+let _askAb=null;
+async function ask(q){q=q||$('#askQ').value.trim();if(!q)return;const out=$('#askOut');
+  if(!SAMPLE){out.textContent='Asking Claude is not available in this view.';return}
+  if(_askAb)_askAb.abort();_askAb=new AbortController();ASKTXT='Thinking…';out.textContent=ASKTXT;
+  try{await SAMPLE([{role:'user',content:`You are a USD/INR and crude-oil research analyst for an Indian importer desk. Answer using ONLY the tracker records below; say when data is missing. Be concise, plain text, no markdown headings. Red/"usd" = rupee weaker.\n\nRECORDS:\n${ctxForAI()}\n\nQUESTION: ${q}`}],{signal:_askAb.signal,onText:({text})=>{ASKTXT=text;const o=$('#askOut');if(o)o.textContent=text},cache:false})}
+  catch(e){if(e&&e.code!=='cancelled'){ASKTXT=e.code==='not_granted'?'Asking Claude was not allowed for this page.':e.code==='rate_limited'?'Too many requests — try again in a minute.':'Could not get an answer ('+(e.message||e.code)+').';const o=$('#askOut');if(o)o.textContent=ASKTXT}}}
+
+/* ================= SESSIONS ================= */
+const EF=['Strongly negative (bearish INR)','Negative (bearish INR)','Mixed / neutral','Pending / watch','Positive / offsetting','Positive (bullish INR)','Strongly positive (bullish INR)'];
+const SESS_F=[{k:'date',l:'Date',t:'date'},{k:'session',l:'Session',t:'sel',o:['Pre-open','Morning','Midday','Evening','Full session','Weekly']},
+  {k:'open',l:'Open / prior ref',ph:'95.95 (prior close)'},{k:'close',l:'Close / spot',ph:'~96.09 (est.)'},{k:'low',l:'Day low',ph:'95.88'},{k:'high',l:'Day high',ph:'96.20'},
+  {k:'tilt',l:'Bias direction',t:'sel',o:[{v:'usd',l:'USD bias (rupee weaker)'},{v:'neutral',l:'Neutral / watch'},{v:'inr',l:'INR bias (rupee firmer)'}]},
+  {k:'bias',l:'Bias label',ph:'Bullish USD/INR — oil + yields'},{k:'conf',l:'Confidence /10',t:'num'},
+  {k:'supports',l:'Support levels',ph:'95.85 / 95.60'},{k:'resistances',l:'Resistance levels',ph:'96.20 / 96.50'},
+  {k:'net',l:'Net read',t:'area',rows:4},
+  {k:'factors',l:'Factor matrix',t:'rows',one:'factor',cols:[{k:'f',l:'Factor'},{k:'lv',l:'Level / change'},{k:'ef',l:'Effect on INR',t:'sel',o:EF},{k:'src',l:'Source (date)'},{k:'url',l:'Source URL'},{k:'d',l:'Details',t:'area',rows:2}]}];
+function prevClose(except,date){const ss=sessionsSorted().filter(x=>x.id!==except&&(!date||x.date<=date));for(const x of ss){const c=num(x.close);if(c!=null&&c>50)return c}return null}
+function rateCheck(v,id){const w=[],o=num(v.open),c=num(v.close),p=prevClose(id,v.date);
+  if(c!=null&&p!=null&&Math.abs(c-p)<0.011)w.push(`Close/spot ${c} is identical to the last logged close (${p}). That is the signature of a frozen FX_IDC feed — cross-check the RBI reference rate.`);
+  if(o!=null&&c!=null&&o>50&&c>50&&Math.abs(o-c)/o*100>1.5)w.push(`Open ${o} and close ${c} differ by ${(Math.abs(o-c)/o*100).toFixed(1)}% — unusually large for one session.`);
+  if(o!=null&&p!=null&&o>50&&Math.abs(o-p)/p*100>1.5)w.push(`Open ${o} is ${(Math.abs(o-p)/p*100).toFixed(1)}% away from the previous logged level ${p}.`);return w}
+function editSession(id){const s=id?S.sessions.find(x=>x.id===id):{date:todayISO(),session:'Morning',tilt:'neutral',conf:6,factors:[{}]};
+  openForm({title:id?'Edit session':'New session',fields:SESS_F,vals:s,req:['date'],check:v=>rateCheck(v,id),
+    onSave:async v=>{const nid=id||(v.date+'_'+String(v.session).toLowerCase().replace(/[^a-z0-9]+/g,'-'));if(id&&nid!==id){}await save('sessions',id||nid,{...v})},
+    onDelete:id?()=>del('sessions',id):null})}
+let SESS_FILTER='__all',SESS_MORE=false;
+function sessCard(s){return `<div class="sess"><div class="sess-head"><span class="d">${fmtD(s.date)}</span><span class="badge">${esc(s.session)}</span>${pill(s.bias||TLAB[s.tilt]||'Neutral',tiltOf(s.tilt||s.bias))}<span style="margin-left:auto">${acts(`editSession('${s.id}')`)}</span></div>
+  <div class="kv"><span>Open <b>${esc(s.open||'—')}</b></span><span>Close <b>${esc(s.close||'—')}</b></span><span>Range <b>${esc([s.low,s.high].filter(Boolean).join(' – ')||'—')}</b></span><span>S <b>${esc(s.supports||'—')}</b></span><span>R <b>${esc(s.resistances||'—')}</b></span><span>Conf ${confDots(s.conf)}</span></div>
+  ${(s.factors||[]).length?`<div class="tw"><table><thead><tr><th>#</th><th>Factor</th><th>Level / change</th><th>Effect on INR</th><th>Source</th><th>Details</th></tr></thead><tbody>${s.factors.map((f,i)=>`<tr><td class="idx">${i+1}</td><td class="fac">${esc(f.f)}</td><td>${esc(f.lv)}</td><td>${pill(f.ef,tiltOf(f.ef))}</td><td>${srcLink(f)}</td><td>${esc(f.d)}</td></tr>`).join('')}</tbody></table></div>`:''}
+  ${s.net?`<div class="netread" style="margin-top:10px">${esc(s.net)}</div>`:''}</div>`}
+function renderSessions(){const ss=sessionsSorted();const dates=[...new Set(ss.map(s=>s.date))];
+  let html=secHead('Master spot &amp; bias log','Newest first · one row per session',`<button class="btn w" onclick="editSession()">+ New session</button>`);
+  html+=ss.length?`<div class="tw"><table><thead><tr><th>Date</th><th>Session</th><th class="num">Open / prior</th><th class="num">Close</th><th class="num">Range</th><th>Bias</th><th>Conf.</th><th class="w"></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${fmtD(s.date)}</b></td><td>${esc(s.session)}</td><td class="num">${esc(s.open||'—')}</td><td class="num">${esc(s.close||'—')}</td><td class="num">${esc([s.low,s.high].filter(Boolean).join(' – ')||'—')}</td><td>${pill(s.bias||TLAB[s.tilt]||'Neutral',tiltOf(s.tilt||s.bias))}</td><td>${confDots(s.conf)}</td><td class="w">${acts(`editSession('${s.id}')`,`askDel('sessions','${s.id}')`)}</td></tr>`).join('')}</tbody></table></div>`:emptyMsg('No sessions logged yet.');
+  html+=secHead('Daily factor matrix','# · Factor · Level · Effect on INR · Source · Details',`<select id="sessF" style="width:auto" onchange="SESS_FILTER=this.value;render()"><option value="__all">All dates</option>${dates.map(d=>`<option value="${d}"${d===SESS_FILTER?' selected':''}>${fmtD(d)}</option>`).join('')}</select>`);
+  let list=SESS_FILTER==='__all'?ss:ss.filter(s=>s.date===SESS_FILTER);const more=list.length>6&&!SESS_MORE;if(more)list=list.slice(0,6);
+  html+=list.map(sessCard).join('')||emptyMsg('No matrix cards.');
+  if(more)html+=`<button class="btn ghost" onclick="SESS_MORE=true;render()">Show all ${ss.length} sessions</button>`;return html}
+function askDel(coll,id){confirmBox('Delete record','This removes the record for everyone who uses this tracker.','Delete',()=>del(coll,id))}
+
+/* ================= OIL ================= */
+const OILCAT=['Geopolitics','Supply / exports','OPEC+','Inventories','SPR / policy','Demand','Refining / products','Curve / positioning'];
+const OIL_F=[{k:'date',l:'Date',t:'date'},{k:'cat',l:'Category',t:'sel',o:OILCAT},{k:'move',l:'Effect on crude',t:'sel',o:['Bullish crude','Bearish crude','Mixed']},
+  {k:'brent',l:'Brent at the time',ph:'$97.1'},{k:'wti',l:'WTI at the time',ph:'$90.2'},{k:'headline',l:'Headline',full:true},{k:'detail',l:'Detail / read-through to INR',t:'area'},{k:'src',l:'Source (date)'},{k:'url',l:'Source URL'}];
+function editOil(id){const o=id?S.oil.find(x=>x.id===id):{date:todayISO(),cat:'Geopolitics',move:'Mixed'};
+  openForm({title:id?'Edit oil entry':'Log oil-market move',fields:OIL_F,vals:o,req:['date','headline'],onSave:v=>save('oil',id||uid(),v),onDelete:id?()=>del('oil',id):null})}
+function editOilStanding(){const o=(S.standing&&S.standing.oil)||{};
+  openForm({title:'Edit oil view',fields:[{k:'tilt',l:'Crude bias label',ph:'Bullish crude — Hormuz unresolved'},{k:'imports',l:'India crude imports (mb/d)',t:'num'},{k:'gdp',l:'India GDP ($bn)',t:'num'},{k:'view',l:'Oil net read',t:'area',rows:4},
+    {k:'supply',l:'Supply & risk tracker',t:'rows',one:'item',cols:[{k:'item',l:'Item'},{k:'status',l:'Status',t:'sel',o:['Disrupted','At risk','Recovering','Normal','Easing','Watch']},{k:'detail',l:'Detail',t:'area',rows:2}]},
+    {k:'scenarios',l:'Crude scenarios (1–3 months)',t:'rows',one:'scenario',cols:[{k:'s',l:'Scenario'},{k:'p',l:'Probability'},{k:'r',l:'Brent range'},{k:'inr',l:'USD/INR read-through'},{k:'t',l:'Triggers',t:'area',rows:2}]}],
+    vals:o,onSave:v=>saveDoc('standing',{...(S.standing||{}),oil:v})})}
+let OILCATF='__all';
+function statusPill(s){const t=/disrupt|at risk/i.test(s)?'usd':/recover|normal|easing/i.test(s)?'inr':'neutral';return pill(s,t)}
+function renderOil(){const o=(S.standing&&S.standing.oil)||{},h=histSorted();
+  const E=((S.indexes&&S.indexes.items)||[]).filter(x=>x.group==='Energy');
+  const b=num(idx('brent')?.level),w=num(idx('wti')?.level),r=num(idx('usdinr')?.level);
+  let html=secHead('Oil market','Crude is India\'s largest import — every dollar on Brent shows up in the rupee',`<button class="btn crude w" onclick="editOil()">+ Log oil move</button><button class="btn ghost w" onclick="editOilStanding()">✎ Edit oil view</button>`);
+  html+=`<div class="grid g4">${E.map(x=>{const c=chg(x);return `<div class="card oil"><div class="eyebrow">${esc(x.name)}</div><div class="big" style="font-size:24px">${esc(x.level)}</div><div class="mono ${c?(c.d>0?'up':'dn'):'flat'}" style="font-size:12px">${c?(c.d>0?'+':'')+c.d.toFixed(2)+' ('+(c.pct>0?'+':'')+c.pct.toFixed(2)+'%)':'—'} <span style="color:var(--muted)">${esc(x.unit||'')}</span></div>${x.note?`<div style="font-size:11.5px;color:var(--muted);margin-top:4px">${esc(x.note)}</div>`:''}</div>`}).join('')}
+    <div class="card oil"><div class="eyebrow">Brent − WTI spread</div><div class="big" style="font-size:24px">${b!=null&&w!=null?'$'+(b-w).toFixed(2):'—'}</div><div style="font-size:11.5px;color:var(--muted)">Wide spread = seaborne (Middle East) crude tighter than US inland supply</div></div>
+    <div class="card oil"><div class="eyebrow">Rupee cost of crude</div><div class="big" style="font-size:24px">${b!=null&&r!=null?'₹'+Math.round(b*r).toLocaleString('en-IN'):'—'}</div><div style="font-size:11.5px;color:var(--muted)">Brent × USD/INR, per barrel. Oil and a weaker rupee compound each other.</div></div></div>`;
+  html+=`<div style="margin:16px 0">${o.tilt?pill(o.tilt,'crude')+' ':''}${o.view?`<div class="netread oil" style="margin-top:8px">${esc(o.view)}</div>`:emptyMsg('No oil view written yet.')}</div>`;
+  html+=`<div class="grid g2"><div class="card oil"><h3>Brent: futures vs Dated (physical), $/bbl</h3>${lineChart('oilBW',[{name:'Brent futures',color:'var(--s2)',pts:h.map(x=>[dts(x.date),num(x.brent_c)])},{name:'Dated Brent',color:'var(--s3)',pts:h.map(x=>[dts(x.date),num(x.brent_spot)])}],{pre:'$'})}<p class="lede" style="margin:6px 0 0">Dated Brent trading far above futures means physical cargoes are scarcer than the paper market implies — the clearest tightness signal.</p></div>
+    <div class="card oil"><h3>WTI: futures vs Cushing spot, $/bbl</h3>${lineChart('oilW',[{name:'WTI futures',color:'var(--s1)',pts:h.map(x=>[dts(x.date),num(x.wti_c)])},{name:'WTI spot',color:'var(--s3)',pts:h.map(x=>[dts(x.date),num(x.wti_spot)])}],{pre:'$'})}</div>
+    <div class="card oil"><h3>Rupee cost per barrel (Brent × USD/INR)</h3>${lineChart('oilRpb',[{name:'₹ per barrel',color:'var(--s3)',pts:h.map(x=>[dts(x.date),num(x.brent_c)!=null&&num(x.usdinr_c)!=null?num(x.brent_c)*num(x.usdinr_c):null])}],{dec:0,pre:'₹',rpad:70})}</div></div>`;
+  html+=secHead('Supply &amp; risk tracker','Chokepoints, exports, reserves, OPEC+');
+  html+=(o.supply||[]).length?`<div class="tw"><table><thead><tr><th>Item</th><th>Status</th><th>Detail</th></tr></thead><tbody>${o.supply.map(x=>`<tr><td class="fac">${esc(x.item)}</td><td>${statusPill(x.status||'Watch')}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table></div>`:emptyMsg('No supply items yet — use Edit oil view.');
+  html+=secHead('Oil shock calculator','What a Brent move does to India\'s import bill');
+  html+=`<div class="card oil"><div class="fgrid"><div class="field"><label for="ocD">Brent change, $/bbl</label><input id="ocD" type="range" min="-40" max="40" step="1" value="10" oninput="calcOil()"></div>
+    <div class="field"><label for="ocM">Crude imports, mb/d</label><input id="ocM" type="number" step="0.1" value="${o.imports||4.8}" oninput="calcOil()"></div>
+    <div class="field"><label for="ocG">India GDP, $bn</label><input id="ocG" type="number" step="50" value="${o.gdp||4200}" oninput="calcOil()"></div>
+    <div class="field"><label for="ocS">USD/INR</label><input id="ocS" type="number" step="0.01" value="${r||96}" oninput="calcOil()"></div></div><div id="ocOut" style="margin-top:12px"></div></div>`;
+  html+=secHead('Crude scenarios','Next 1–3 months');
+  html+=(o.scenarios||[]).length?`<div class="tw"><table><thead><tr><th>Scenario</th><th class="num">Prob.</th><th class="num">Brent range</th><th>USD/INR read-through</th><th>Triggers</th></tr></thead><tbody>${o.scenarios.map(x=>`<tr><td class="fac" style="color:${/bull/i.test(x.s)?'var(--usd)':/bear/i.test(x.s)?'var(--inr)':'var(--ink)'}">${esc(x.s)}</td><td class="num">${esc(x.p)}</td><td class="num">${esc(x.r)}</td><td>${esc(x.inr)}</td><td>${esc(x.t)}</td></tr>`).join('')}</tbody></table></div>`:emptyMsg('No crude scenarios yet.');
+  const list=[...S.oil].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).filter(x=>OILCATF==='__all'||x.cat===OILCATF);
+  html+=secHead('Oil-market log','Every move that matters for crude, newest first',`<select style="width:auto" onchange="OILCATF=this.value;render()"><option value="__all">All categories</option>${OILCAT.map(c=>`<option${c===OILCATF?' selected':''}>${c}</option>`).join('')}</select>`);
+  html+=list.length?`<div class="tw"><table><thead><tr><th>Date</th><th>Category</th><th>Headline</th><th>Crude</th><th class="num">Brent</th><th class="num">WTI</th><th>Read-through</th><th>Source</th><th class="w"></th></tr></thead><tbody>${list.map(x=>`<tr><td class="mono" style="white-space:nowrap">${fmtD(x.date)}</td><td>${pill(x.cat,'plain')}</td><td class="fac">${esc(x.headline)}</td><td>${pill(x.move,/bull/i.test(x.move)?'usd':/bear/i.test(x.move)?'inr':'neutral')}</td><td class="num">${esc(x.brent||'—')}</td><td class="num">${esc(x.wti||'—')}</td><td>${esc(x.detail)}</td><td>${srcLink(x)}</td><td class="w">${acts(`editOil('${x.id}')`,`askDel('oil','${x.id}')`)}</td></tr>`).join('')}</tbody></table></div>`:emptyMsg('No oil entries.');
+  html+=`<p class="lede" style="margin-top:10px">Crude colour key: <b style="color:var(--usd)">bullish crude</b> is rupee-negative (bigger import bill), <b style="color:var(--inr)">bearish crude</b> is rupee-supportive.</p>`;
+  return html}
+function calcOil(){const d=+$('#ocD').value,m=+$('#ocM').value||0,g=+$('#ocG').value||1,s=+$('#ocS').value||0;
+  const bill=d*m*0.365; const pct=bill/g*100; const b=num(idx('brent')?.level);
+  $('#ocOut').innerHTML=`<div class="grid g4" style="gap:10px"><div><div class="eyebrow">Brent move</div><div class="big" style="font-size:22px">${d>0?'+':''}${d} $/bbl</div></div>
+  <div><div class="eyebrow">Annual import bill</div><div class="big ${d>0?'up':d<0?'dn':''}" style="font-size:22px">${bill>0?'+':''}$${bill.toFixed(1)} bn</div></div>
+  <div><div class="eyebrow">Current account</div><div class="big ${d>0?'up':d<0?'dn':''}" style="font-size:22px">${pct>0?'−':'+'}${Math.abs(pct).toFixed(2)}% GDP</div></div>
+  <div><div class="eyebrow">₹ cost per barrel</div><div class="big" style="font-size:22px">${b!=null?'₹'+Math.round((b+d)*s).toLocaleString('en-IN'):'—'}</div></div></div>
+  <p class="lede" style="margin:8px 0 0">Import bill = Δ$/bbl × mb/d × 365. Gross crude only; product exports and gas imports are not netted, so treat it as an upper-bound first pass.</p>`}
+
+/* ================= INDEXES ================= */
+const GROUPS=['FX','Energy','Rates','Equities','Metals','Policy & macro'];
+function editIndexes(){const d=S.indexes||{items:[]};
+  openForm({title:'Edit indexes',intro:'Keys used by the header strip and oil tab: usdinr, brent, wti, dxy, us10y, gold.',fields:[{k:'asof',l:'Levels as of',ph:'30 Sep 2026, 16:30 IST',full:true},
+   {k:'items',l:'Instruments',t:'rows',one:'instrument',cols:[{k:'k',l:'Key'},{k:'name',l:'Name'},{k:'group',l:'Group',t:'sel',o:GROUPS},{k:'level',l:'Level'},{k:'prev',l:'Previous'},{k:'unit',l:'Unit'},{k:'note',l:'Note'},{k:'url',l:'Live link'}]}],
+   vals:d,onSave:v=>saveDoc('indexes',v)})}
+function renderIndexes(){const it=(S.indexes&&S.indexes.items)||[];
+  let html=secHead('Indexes &amp; market board',S.indexes&&S.indexes.asof?'As of '+esc(S.indexes.asof):'',`<button class="btn w" onclick="editIndexes()">✎ Update levels</button>`);
+  html+=`<p class="lede">Recorded levels for everything that moves the rupee. Change is against the previous recorded level. The page cannot stream quotes, so use the live links to cross-check before logging — and treat an unchanged USD/INR print as a possibly frozen feed.</p>`;
+  if(!it.length)return html+emptyMsg('No instruments yet.');
+  GROUPS.forEach(g=>{const rows=it.filter(x=>(x.group||'FX')===g);if(!rows.length)return;
+    html+=`<h3 style="font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:${g==='Energy'?'var(--crude)':'var(--accent)'};margin:18px 0 6px">${g}</h3><div class="tw"><table><thead><tr><th>Instrument</th><th class="num">Level</th><th class="num">Previous</th><th class="num">Change</th><th class="num">%</th><th>Unit</th><th>Note</th><th>Live</th></tr></thead><tbody>${rows.map(x=>{const c=chg(x);return `<tr><td class="fac">${esc(x.name)}</td><td class="num"><b>${esc(x.level)}</b></td><td class="num">${esc(x.prev||'—')}</td><td class="num ${c?(c.d>0?'up':c.d<0?'dn':'flat'):''}">${c?(c.d>0?'+':'')+c.d.toFixed(Math.abs(c.d)<1?3:2):'—'}</td><td class="num">${c?(c.pct>0?'+':'')+c.pct.toFixed(2)+'%':'—'}</td><td>${esc(x.unit||'')}</td><td style="color:var(--muted)">${esc(x.note||'')}</td><td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">open ↗</a>`:''}</td></tr>`}).join('')}</tbody></table></div>`});
+  html+=`<p class="lede" style="margin-top:10px">Change colour is plain direction here (red up, green down); read each line's meaning for the rupee from the drivers.</p>`;return html}
+
+/* ================= DRIVERS ================= */
+function editDrivers(){const st=S.standing||{};
+  openForm({title:'Edit drivers',fields:[{k:'driversNote',l:'Drivers note',t:'area',rows:4},{k:'drivers',l:'Drivers (in order of influence)',t:'rows',one:'driver',cols:[{k:'driver',l:'Driver'},{k:'bias',l:'Bias label'},{k:'tilt',l:'Direction',t:'sel',o:[{v:'usd',l:'USD (rupee weaker)'},{v:'neutral',l:'Mixed / two-way'},{v:'inr',l:'INR (rupee firmer)'}]},{k:'weight',l:'Weight 1–10',t:'num'},{k:'analysis',l:'Analysis',t:'area',rows:3}]}],
+   vals:st,onSave:v=>saveDoc('standing',{...st,...v})})}
+function renderDrivers(){const st=S.standing||{},d=st.drivers||[],dt=driverTilt();
+  let html=secHead('Major market drivers','Ranked by influence · standing analysis',`<button class="btn w" onclick="editDrivers()">✎ Edit drivers</button>`);
+  if(st.driversNote)html+=`<p class="lede">${esc(st.driversNote)}</p>`;
+  html+=`<div class="card" style="margin-bottom:14px;max-width:560px"><h3>Weighted tilt: ${(dt*100).toFixed(0)}</h3>${tiltBar(dt)}</div>`;
+  html+=d.length?`<div class="tw"><table><thead><tr><th>#</th><th>Driver</th><th>Bias on USD/INR</th><th>Weight</th><th>Analysis</th></tr></thead><tbody>${d.map((x,i)=>`<tr><td class="idx">${i+1}</td><td class="fac">${esc(x.driver)}</td><td>${pill(x.bias||TLAB[x.tilt],tiltOf(x.tilt||x.bias))}</td><td class="mono" style="white-space:nowrap">${'▮'.repeat(Math.round(num(x.weight)||0))}<span style="color:var(--line)">${'▮'.repeat(10-Math.round(num(x.weight)||0))}</span></td><td>${esc(x.analysis)}</td></tr>`).join('')}</tbody></table></div>`:emptyMsg('No drivers yet.');return html}
+
+/* ================= OUTLOOK ================= */
+const HZ=[['short','Short term · 1 month'],['medium','Medium term · 2–3 months'],['long','Long term · 6–12 months']];
+function editOutlook(h){const tl=(S.standing&&S.standing.timeline)||{};
+  const fields=h?[{k:'rows',l:HZ.find(x=>x[0]===h)[1],t:'rows',one:'scenario',cols:[{k:'s',l:'Scenario'},{k:'p',l:'Probability'},{k:'r',l:'USD/INR range'},{k:'t',l:'Key triggers / levels',t:'area',rows:2}]}]:[{k:'read',l:'Net read',t:'area',rows:5}];
+  openForm({title:h?'Edit scenarios':'Edit outlook net read',fields,vals:h?{rows:tl[h]||[]}:{read:tl.read||''},
+   onSave:v=>{const nt={...tl};if(h)nt[h]=v.rows;else nt.read=v.read;return saveDoc('standing',{...(S.standing||{}),timeline:nt})}})}
+function probBar(rows){let u=0,b=0,i=0;rows.forEach(r=>{const p=num(r.p)||0;if(/bull/i.test(r.s))u+=p;else if(/bear/i.test(r.s))i+=p;else b+=p});const t=u+b+i||1;
+  return `<div class="prob" role="img" aria-label="Bullish USD ${u}%, base ${b}%, bearish USD ${i}%"><div class="pu" style="flex:${u/t}">${u?'USD↑ '+u+'%':''}</div><div class="pb" style="flex:${b/t}">${b?'Base '+b+'%':''}</div><div class="pi" style="flex:${i/t}">${i?'INR↑ '+i+'%':''}</div></div>`}
+function renderOutlook(){const tl=(S.standing&&S.standing.timeline)||{};
+  let html=secHead('Timeline probability &amp; exchange-rate ranges','Base = most likely path · Bullish USD = rupee weaker · Bearish USD = rupee firmer');
+  HZ.forEach(([k,l])=>{const rows=tl[k]||[];html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px"><h3 style="font-size:15px">${l}</h3><button class="btn ghost w" onclick="editOutlook('${k}')">✎ Edit</button></div>`;
+    html+=rows.length?probBar(rows)+`<div class="tw"><table><thead><tr><th>Scenario</th><th class="num">Probability</th><th class="num">USD/INR range</th><th>Key triggers / levels</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="fac" style="color:${/bull/i.test(r.s)?'var(--usd)':/bear/i.test(r.s)?'var(--inr)':'var(--ink)'}">${esc(r.s)}</td><td class="num"><b>${esc(r.p)}</b></td><td class="num"><b>${esc(r.r)}</b></td><td>${esc(r.t)}</td></tr>`).join('')}</tbody></table></div>`:emptyMsg('No scenarios.')});
+  html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px"><h3 style="font-size:15px">Net read</h3><button class="btn ghost w" onclick="editOutlook()">✎ Edit</button></div>${tl.read?`<div class="netread" style="margin-top:8px">${esc(tl.read)}</div>`:emptyMsg('No net read.')}`;return html}
+
+/* ================= CALENDAR ================= */
+const EV_F=[{k:'date',l:'Date label',ph:'28 Oct 2026'},{k:'sort',l:'Sort date',t:'date'},{k:'area',l:'Area',t:'sel',o:['US','India','Oil','Global']},{k:'impact',l:'Impact',t:'sel',o:['High','Medium','Low']},{k:'event',l:'Event',full:true},{k:'note',l:'Note / expected impact',t:'area',rows:2},{k:'done',l:'Done',t:'chk'}];
+function editEvent(id){const e=id?S.events.find(x=>x.id===id):{area:'US',impact:'High'};openForm({title:id?'Edit event':'New event',fields:EV_F,vals:e,req:['date','event'],onSave:v=>save('events',id||uid(),v),onDelete:id?()=>del('events',id):null})}
+function toggleEv(id){const e=S.events.find(x=>x.id===id);if(e)save('events',id,{...e,done:!e.done})}
+let EVSORT='asc',EVSHOW='open';
+function renderCalendar(){let ev=[...S.events].sort((a,b)=>{const x=a.sort||'9999',y=b.sort||'9999';return EVSORT==='asc'?x.localeCompare(y):y.localeCompare(x)});if(EVSHOW==='open')ev=ev.filter(e=>!e.done);
+  let html=secHead('Upcoming events &amp; watch calendar','Scheduled risk for USD, INR and crude',`<button class="btn w" onclick="editEvent()">+ Add event</button>`);
+  html+=`<div class="toolbar"><button class="btn ${EVSHOW==='open'?'':'ghost'}" onclick="EVSHOW='open';render()">Upcoming</button><button class="btn ${EVSHOW==='all'?'':'ghost'}" onclick="EVSHOW='all';render()">All incl. done</button><span style="width:12px"></span><button class="btn ghost" onclick="EVSORT=EVSORT==='asc'?'desc':'asc';render()">Sort: ${EVSORT==='asc'?'soonest first':'latest first'}</button></div>`;
+  html+=ev.length?ev.map(e=>`<div class="ev ${e.done?'done':''}"><span class="d">${esc(e.date)}</span><span><b>${esc(e.event)}</b> ${pill(e.area||'—',e.area==='Oil'?'crude':'plain')} ${e.impact==='High'?pill('High impact','usd'):''}<small>${esc(e.note||'')}</small></span><span style="display:flex;gap:4px"><button class="btn ghost w" style="padding:4px 9px;font-size:11.5px" onclick="toggleEv('${e.id}')">${e.done?'Reopen':'Mark done'}</button>${acts(`editEvent('${e.id}')`,`askDel('events','${e.id}')`)}</span></div>`).join(''):emptyMsg('No events.');return html}
+
+/* ================= HISTORY ================= */
+const HIST_F=[{k:'date',l:'Date',t:'date'},{k:'usdinr_o',l:'USD/INR open'},{k:'usdinr_c',l:'USD/INR close'},{k:'brent_o',l:'Brent fut. open'},{k:'brent_c',l:'Brent fut. close'},{k:'brent_spot',l:'Dated Brent (spot)'},{k:'wti_o',l:'WTI fut. open'},{k:'wti_c',l:'WTI fut. close'},{k:'wti_spot',l:'WTI spot (Cushing)'},{k:'dxy_o',l:'DXY open'},{k:'dxy_c',l:'DXY close'},{k:'us10y',l:'US 10Y %'},{k:'in10y',l:'India 10Y %'},{k:'gold',l:'Gold $/oz'},{k:'note',l:'Note',t:'area',rows:2}];
+function editHist(id){const h=id?S.history.find(x=>x.id===id):{date:todayISO()};openForm({title:id?'Edit history row':'New history row',fields:HIST_F,vals:h,req:['date'],
+  check:v=>rateCheck({date:v.date,open:v.usdinr_o,close:v.usdinr_c},'__none'),onSave:v=>save('history',v.date,v).then(()=>{if(id&&id!==v.date)return del('history',id)}),onDelete:id?()=>del('history',id):null})}
+function corr(a,b){const n=a.length;if(n<5)return null;const ma=a.reduce((s,x)=>s+x,0)/n,mb=b.reduce((s,x)=>s+x,0)/n;let c=0,va=0,vb=0;for(let i=0;i<n;i++){c+=(a[i]-ma)*(b[i]-mb);va+=(a[i]-ma)**2;vb+=(b[i]-mb)**2}return va&&vb?c/Math.sqrt(va*vb):null}
+function renderHistory(){const h=histSorted();
+  const ret=[];for(let i=1;i<h.length;i++){const a0=num(h[i-1].usdinr_c),a1=num(h[i].usdinr_c),b0=num(h[i-1].brent_c),b1=num(h[i].brent_c);if([a0,a1,b0,b1].every(x=>x!=null)&&dts(h[i].date)-dts(h[i-1].date)<=5*864e5)ret.push([(a1-a0)/a0,(b1-b0)/b0])}
+  const c=corr(ret.map(x=>x[0]),ret.map(x=>x[1]));
+  let html=secHead('History','Daily open / close · the data behind every chart',`<button class="btn w" onclick="editHist()">+ Add day</button>`);
+  const base=h.find(r=>num(r.usdinr_c)&&num(r.brent_c)&&num(r.dxy_c));
+  html+=`<div class="grid g2"><div class="card"><h3>USD/INR close</h3>${lineChart('hInr',[{name:'USD/INR',color:'var(--s1)',pts:h.map(r=>[dts(r.date),num(r.usdinr_c)])}])}</div>
+   <div class="card"><h3>Dollar Index (DXY) close</h3>${lineChart('hDxy',[{name:'DXY',color:'var(--s3)',pts:h.map(r=>[dts(r.date),num(r.dxy_c)])}])}</div>
+   <div class="card oil"><h3>Brent and WTI futures close, $/bbl</h3>${lineChart('hOil',[{name:'Brent',color:'var(--s2)',pts:h.map(r=>[dts(r.date),num(r.brent_c)])},{name:'WTI',color:'var(--s1)',pts:h.map(r=>[dts(r.date),num(r.wti_c)])}],{pre:'$'})}</div>
+   <div class="card"><h3>Indexed to 100 on ${base?fmtD(base.date):'first common day'}</h3>${base?lineChart('hIdx',[['USD/INR','usdinr_c','var(--s1)'],['Brent','brent_c','var(--s2)'],['DXY','dxy_c','var(--s3)']].map(([n,k,col])=>({name:n,color:col,pts:h.filter(r=>r.date>=base.date).map(r=>[dts(r.date),num(r[k])!=null?num(r[k])/num(base[k])*100:null])})),{dec:1}):emptyMsg('Needs a day with USD/INR, Brent and DXY closes.')}</div></div>`;
+  html+=`<div class="card" style="margin-top:16px"><h3>USD/INR vs Brent — daily-change correlation</h3><div class="big" style="font-size:24px">${c==null?'—':c.toFixed(2)}</div><p class="lede" style="margin:4px 0 0">${c==null?'Needs at least 5 consecutive-day pairs of closes. ':'Over '+ret.length+' consecutive-day pairs. '}Above +0.3 means oil is steering the rupee; near zero means other drivers (flows, RBI, the dollar) dominate.</p></div>`;
+  html+=`<div class="tw" style="margin-top:16px"><table><thead><tr><th>Date</th><th class="num">USD/INR O</th><th class="num">USD/INR C</th><th class="num">Brent O</th><th class="num">Brent C</th><th class="num">Dated Brent</th><th class="num">WTI O</th><th class="num">WTI C</th><th class="num">WTI spot</th><th class="num">DXY O</th><th class="num">DXY C</th><th class="num">US10Y</th><th class="num">IN10Y</th><th class="num">Gold</th><th>Note</th><th class="w"></th></tr></thead><tbody>${[...h].reverse().map(r=>`<tr><td><b>${fmtD(r.date)}</b></td>${['usdinr_o','usdinr_c','brent_o','brent_c','brent_spot','wti_o','wti_c','wti_spot','dxy_o','dxy_c','us10y','in10y','gold'].map(k=>`<td class="num">${esc(r[k]||'—')}</td>`).join('')}<td style="color:var(--muted);min-width:180px">${esc(r.note||'')}</td><td class="w">${acts(`editHist('${r.id}')`,`askDel('history','${r.id}')`)}</td></tr>`).join('')||`<tr><td colspan="16" class="empty">No history rows.</td></tr>`}</tbody></table></div>`;return html}
+
+/* ================= COVER SIGNAL ================= */
+const SIGW={oil:.25,rates:.15,flows:.15,tech:.15,carry:.10};
+const SIG={oil:0,rates:0,flows:0,tech:0,carry:0,f1:'',f3:'',f6:'',f12:'',spot:'',def:'',date:''};
+function rbiCfg(){return (S.standing&&S.standing.rbi)||{defended:96.25,band:40}}
+function sgV(id){const e=document.getElementById(id);return e?(parseFloat(e.value)||0):0}
+function computeSignal(){const cfg=rbiCfg();const spot=sgV('sgSpot'),def=sgV('sgDef')||cfg.defended;
+  ['oil','rates','flows','tech','carry'].forEach(k=>{SIG[k]=sgV('sg_'+k);const r=document.getElementById('rd_'+k);if(r)r.textContent=(SIG[k]>0?'+':'')+SIG[k]});
+  ['f1','f3','f6','f12'].forEach(k=>SIG[k]=(document.getElementById('sg'+k)||{}).value||'');SIG.spot=(document.getElementById('sgSpot')||{}).value||'';SIG.def=(document.getElementById('sgDef')||{}).value||'';SIG.date=(document.getElementById('sgDate')||{}).value||'';
+  let raw=(SIG.oil*SIGW.oil+SIG.rates*SIGW.rates+SIG.flows*SIGW.flows+SIG.tech*SIGW.tech+SIG.carry*SIGW.carry)/.8;let note='No defended-level constraint active.';
+  if(spot>0&&def>0){const dist=Math.round((def-spot)*100);if(dist>=0&&dist<cfg.band){const prox=Math.min(1,Math.max(0,1-dist/cfg.band));if(raw>0){raw*=1-prox*.85;note=`Within ${dist} paise of the defended ${def.toFixed(2)} — the "cover" reading is dampened ${Math.round(prox*85)}% because the RBI tends to reverse moves there. Don't chase USD into the level.`}else note=`Near the defended ${def.toFixed(2)} but the read favours the rupee — an RBI-engineered dip is the moment to cover.`}
+    else if(dist<0)note=`Spot is above the ${def.toFixed(2)} defended level — the override is off; the cap has given way.`;else note=`Spot is ${dist} paise below the defended ${def.toFixed(2)} — outside the override band.`}
+  const score=Math.max(-100,Math.min(100,raw));let a,hdg,cls;
+  if(score>=50){a='COVER AGGRESSIVELY';hdg='80–90%';cls='usd'}else if(score>=20){a='COVER';hdg='70–80%';cls='usd'}else if(score>-20){a='NEUTRAL — hold ratio';hdg='55–65%';cls='neutral'}else if(score>-50){a='PARTIAL — wait for dips';hdg='45–55%';cls='inr'}else{a='HOLD OFF — wait';hdg='35–45%';cls='inr'}
+  const fw=[['1M',num(SIG.f1),1],['3M',num(SIG.f3),3],['6M',num(SIG.f6),6],['12M',num(SIG.f12),12]];
+  const out=document.getElementById('sgOut');if(out)out.innerHTML=`<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="gauge" style="flex:1;min-width:200px"><div class="fill" style="left:${score>=0?50:(score+100)/2}%;width:${Math.abs(score)/2}%;background:var(--${cls==='neutral'?'watch':cls})"></div><div class="mid"></div></div><div class="big">${score>0?'+':''}${score.toFixed(0)}<span style="font-size:13px;color:var(--muted)">/100</span></div></div>
+   <div style="margin:10px 0">${pill(a,cls)} &nbsp;Suggested hedge ratio <b>${hdg}</b></div><div class="netread">${esc(note)}</div>
+   <h3 style="font-size:13px;margin:14px 0 6px">Forward-adjusted all-in cost</h3><div class="tw"><table><thead><tr><th>Tenor</th><th class="num">Fwd pts (paise)</th><th class="num">All-in rate</th><th class="num">Annualised premium</th></tr></thead><tbody>${fw.map(([l,p,m])=>`<tr><td>${l}</td><td class="num">${p!=null?(p>0?'+':'')+p:'—'}</td><td class="num"><b>${spot&&p!=null?(spot+p/100).toFixed(2):'—'}</b></td><td class="num">${spot&&p!=null?((p/100)/spot*(12/m)*100).toFixed(2)+'%':'—'}</td></tr>`).join('')}</tbody></table></div>`;
+  return {score,a,hdg,spot,def}}
+async function logSignal(){const r=computeSignal();const date=($('#sgDate').value||todayISO());await save('signals',uid(),{date,score:Math.round(r.score),action:r.a,hedge:r.hdg,spot:r.spot,defended:r.def,oil:SIG.oil,rates:SIG.rates,flows:SIG.flows,tech:SIG.tech,carry:SIG.carry,outcome:''});toast('Signal logged')}
+function setOutcome(id,v){const s=S.signals.find(x=>x.id===id);if(s)save('signals',id,{...s,outcome:v})}
+function editRbi(){openForm({title:'RBI defended level',fields:[{k:'defended',l:'Defended level',t:'num'},{k:'band',l:'Override band (paise)',t:'num'}],vals:rbiCfg(),onSave:v=>saveDoc('standing',{...(S.standing||{}),rbi:v})})}
+function renderSignal(){const cfg=rbiCfg(),spot=num(idx('usdinr')?.level)||'';
+  const sl=(k,l,w,hint)=>`<div class="field" style="margin:8px 0"><label for="sg_${k}" style="display:flex;gap:8px"><span>${l} · ${w}</span><span style="text-transform:none;letter-spacing:0;font-weight:400">${hint}</span><b id="rd_${k}" class="mono" style="margin-left:auto;color:var(--accent)">0</b></label><input id="sg_${k}" type="range" min="-100" max="100" step="5" value="${SIG[k]}" oninput="computeSignal()"></div>`;
+  let html=secHead('Cover signal','For buying USD against INR · a daily posture tool, not an execution trigger',`<button class="btn ghost w" onclick="editRbi()">✎ Defended level ${cfg.defended}</button>`);
+  html+=`<p class="lede">Each factor: <b style="color:var(--usd)">+100</b> argues cover now (rupee likely weaker), <b style="color:var(--inr)">−100</b> argues wait (rupee likely firmer). The RBI-band override dampens a cover reading when spot sits just under the defended level.</p>`;
+  html+=`<div class="grid g2"><div class="card"><div class="fgrid"><div class="field"><label for="sgDate">Date</label><input id="sgDate" type="date" value="${SIG.date||todayISO()}"></div><div class="field"><label for="sgSpot">Live spot</label><input id="sgSpot" type="number" step="0.01" value="${SIG.spot||spot}" oninput="computeSignal()"></div><div class="field"><label for="sgDef">Defended level</label><input id="sgDef" type="number" step="0.01" value="${SIG.def||cfg.defended}" oninput="computeSignal()"></div></div>
+   ${sl('oil','Oil / geopolitics','25%','rising crude → +')}${sl('rates','Rate diff / Fed','15%','hawkish Fed → +')}${sl('flows','Flows &amp; positioning','15%','FPI outflows → +')}${sl('tech','Technical','15%','uptrend → +')}${sl('carry','Carry / fwd premium','10%','rich premium → +')}</div>
+   <div class="card"><h3>Forward points (paise)</h3><div class="fgrid">${['f1','f3','f6','f12'].map((k,i)=>`<div class="field"><label for="sg${k}">${['1M','3M','6M','12M'][i]}</label><input id="sg${k}" type="number" step="0.5" value="${SIG[k]}" oninput="computeSignal()"></div>`).join('')}</div><p class="lede" style="margin:8px 0 0">22 = +0.22 rupee. Positive = INR at a forward discount, so the all-in USD cost rises with tenor.</p></div></div>
+   <div class="card" style="margin-top:16px"><div id="sgOut"></div><div class="toolbar" style="margin:14px 0 0"><button class="btn w" onclick="logSignal()">+ Log this signal</button></div></div>`;
+  const sg=[...S.signals].sort((a,b)=>(b.date||'').localeCompare(a.date||''));let hit=0,sc=0;
+  html+=secHead('Signal log &amp; backtest','Logged signals and their next-day outcome');
+  html+=sg.length?`<div class="tw"><table><thead><tr><th>Date</th><th class="num">Spot</th><th class="num">Score</th><th>Signal</th><th>Hedge</th><th>Outcome</th><th class="w"></th></tr></thead><tbody>${sg.map(s=>{let ok='';if(['up','down','flat'].includes(s.outcome)){sc++;const ag=(s.score>=20&&s.outcome==='up')||(s.score<=-20&&s.outcome==='down')||(Math.abs(s.score)<20&&s.outcome==='flat');if(ag)hit++;ok=ag?pill('✓ right','inr'):pill('✗ wrong','usd')}
+     return `<tr><td><b>${fmtD(s.date)}</b></td><td class="num">${s.spot?(+s.spot).toFixed(2):'—'}</td><td class="num"><b>${s.score>0?'+':''}${s.score}</b></td><td>${pill(s.action,s.score>=20?'usd':s.score<=-20?'inr':'neutral')}</td><td>${esc(s.hedge)}</td><td><select class="ind-sel" onchange="setOutcome('${s.id}',this.value)" ${CAN?'':'disabled'}><option value="">— set —</option>${[['up','USD/INR rose'],['flat','~flat'],['down','USD/INR fell']].map(([v,l])=>`<option value="${v}"${s.outcome===v?' selected':''}>${l}</option>`).join('')}</select> ${ok}</td><td class="w">${acts(`askDel('signals','${s.id}')`)}</td></tr>`}).join('')}</tbody></table></div><p class="lede" style="margin-top:8px">Hit-rate: <b>${sc?Math.round(hit/sc*100)+'%':'—'}</b> over ${sc} scored of ${sg.length}. On a managed float, 55–60% is a realistic ceiling.</p>`:emptyMsg('No signals logged yet.');return html}
+
+/* ================= TECHNICALS ================= */
+const IND_OSC=[["rsi","RSI (14)"],["stochk","Stochastic %K"],["cci","CCI (20)"],["adx","ADX (14)"],["ao","Awesome Osc"],["mom","Momentum (10)"],["macd","MACD (12,26)"],["stochrsi","Stoch RSI"],["wr","Williams %R"],["bbp","Bull/Bear Power"],["uo","Ultimate Osc"]];
+const IND_MA=[["ema10","EMA 10"],["sma10","SMA 10"],["ema20","EMA 20"],["sma20","SMA 20"],["ema30","EMA 30"],["sma30","SMA 30"],["ema50","EMA 50"],["sma50","SMA 50"],["ema100","EMA 100"],["sma100","SMA 100"],["ema200","EMA 200"],["sma200","SMA 200"],["ichi","Ichimoku Base"],["vwma","VWMA (20)"],["hull","Hull MA (9)"]];
+function indVals(){return (S.indicators&&S.indicators.vals)||{}}
+let _indT;function setInd(k,v){const vals={...indVals(),[k]:v};S.indicators={...(S.indicators||{}),vals};render();clearTimeout(_indT);_indT=setTimeout(()=>saveDoc('indicators',S.indicators),900)}
+function tally(){const v=indVals(),all=IND_OSC.concat(IND_MA);let b=0,s=0,n=0;all.forEach(([k])=>{if(v[k]==='buy')b++;else if(v[k]==='sell')s++;else if(v[k]==='neutral')n++});
+  const m=b+s+n;if(m<18)return {b,s,n,m,verdict:'NOT SET',ratio:0};const r=(b-s)/m;return {b,s,n,m,ratio:r,verdict:r>.5?'STRONG BUY USD/INR':r>.1?'BUY USD/INR':r<-.5?'STRONG SELL USD/INR':r<-.1?'SELL USD/INR':'NEUTRAL'}}
+function applyTech(){const t=tally();if(t.verdict==='NOT SET'){toast('Mark at least 18 indicators first — an empty board is not a neutral market.');return}SIG.tech=Math.round(Math.max(-100,Math.min(100,t.ratio*100)));TAB='signal';render();toast('Technical factor set to '+SIG.tech)}
+async function logTech(){const t=tally();await save('techlog',uid(),{date:$('#indDate').value||todayISO(),buy:t.b,sell:t.s,neutral:t.n,verdict:t.verdict});toast('Tally logged')}
+function renderTechnical(){const v=indVals(),t=tally();
+  const tbl=l=>`<table><tbody>${l.map(([k,n])=>`<tr><td>${n}</td><td style="text-align:right"><select class="ind-sel ${v[k]||''}" onchange="setInd('${k}',this.value)" ${CAN?'':'disabled'}><option value="">— not set —</option><option value="buy"${v[k]==='buy'?' selected':''}>Buy</option><option value="neutral"${v[k]==='neutral'?' selected':''}>Neutral</option><option value="sell"${v[k]==='sell'?' selected':''}>Sell</option></select></td></tr>`).join('')}</tbody></table>`;
+  let html=secHead('Technical signals','26-indicator board · Buy = USD/INR up (rupee weaker)');
+  html+=`<p class="lede">Live widgets can't run inside this page, so read the ratings on TradingView and mark them here. Daily = 1-month view, Weekly = 2–3 months, Monthly = 6–12 months.</p><div class="toolbar">${[['USD/INR technicals','https://www.tradingview.com/symbols/USDINR/technicals/'],['DXY technicals','https://www.tradingview.com/symbols/TVC-DXY/technicals/'],['Brent technicals','https://www.tradingview.com/symbols/TVC-UKOIL/technicals/'],['RBI reference rate','https://www.fbil.org.in/#/home']].map(([l,u])=>`<a class="btn ghost" href="${u}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}</div>`;
+  html+=`<div class="card" style="margin-bottom:14px">${t.verdict==='NOT SET'?pill(`Not set — ${t.m} of 26 marked`,'neutral')+' <span class="lede">Mark at least 18 for a consensus.</span>':`${pill('Buy '+t.b,'usd')} ${pill('Neutral '+t.n,'neutral')} ${pill('Sell '+t.s,'inr')} → ${pill(t.verdict,/BUY/.test(t.verdict)?'usd':/SELL/.test(t.verdict)?'inr':'neutral')}`}
+   <div class="toolbar w" style="margin:12px 0 0"><button class="btn" onclick="applyTech()">Apply to cover signal</button><button class="btn ghost" onclick="S.indicators={vals:{}};saveDoc('indicators',S.indicators)">Reset board</button><input id="indDate" type="date" value="${todayISO()}" style="width:auto"><button class="btn ghost" onclick="logTech()">Log today's tally</button></div></div>`;
+  html+=`<div class="grid g2"><div class="card"><h3>Oscillators (11)</h3>${tbl(IND_OSC)}</div><div class="card"><h3>Moving averages (15)</h3>${tbl(IND_MA)}</div></div>`;
+  const tl=[...S.techlog].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  html+=secHead('Daily technical tally','Record');html+=tl.length?`<div class="tw"><table><thead><tr><th>Date</th><th class="num">Buy</th><th class="num">Neutral</th><th class="num">Sell</th><th>Consensus</th><th class="w"></th></tr></thead><tbody>${tl.map(r=>`<tr><td><b>${fmtD(r.date)}</b></td><td class="num">${r.buy}</td><td class="num">${r.neutral}</td><td class="num">${r.sell}</td><td>${pill(r.verdict,/BUY/.test(r.verdict)?'usd':/SELL/.test(r.verdict)?'inr':'neutral')}</td><td class="w">${acts(`askDel('techlog','${r.id}')`)}</td></tr>`).join('')}</tbody></table></div>`:emptyMsg('No tallies logged.');return html}
+
+/* ================= PROMPTS ================= */
+function editPrompt(id){const p=id?S.prompts.find(x=>x.id===id):{order:S.prompts.length+1};openForm({title:id?'Edit prompt':'New prompt',fields:[{k:'title',l:'Title'},{k:'when',l:'When to run'},{k:'order',l:'Order',t:'num'},{k:'body',l:'Prompt text',t:'area',rows:14}],vals:p,req:['title'],onSave:v=>save('prompts',id||uid(),v),onDelete:id?()=>del('prompts',id):null})}
+function copyPrompt(id,btn){const p=S.prompts.find(x=>x.id===id);const pre=document.getElementById('pb_'+id);
+  const done=()=>{btn.textContent='Copied ✓';setTimeout(()=>btn.textContent='Copy',2000)};
+  const fb=()=>{const r=document.createRange();r.selectNodeContents(pre);const s=getSelection();s.removeAllRanges();s.addRange(r);btn.textContent='Selected — press Ctrl/⌘+C'};
+  try{navigator.clipboard.writeText(p.body||'').then(done,fb)}catch(e){fb()}}
+function renderPrompts(){const ps=[...S.prompts].sort((a,b)=>(a.order||99)-(b.order||99));
+  let html=secHead('Analyst prompt library','Copy, paste into Claude, then log the output',`<button class="btn w" onclick="editPrompt()">+ New prompt</button>`);
+  html+=`<p class="lede">Tip: in a Claude chat about this tracker you can also say "run the morning brief and log it" — Claude can write the session, oil entries and index levels straight into this page.</p>`;
+  html+=ps.length?`<div class="grid g2">${ps.map(p=>`<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><h3 style="font-size:16px;margin:0">${esc(p.title)}</h3><div style="font-size:12px;color:var(--muted)">${esc(p.when||'')}</div></div><span style="display:flex;gap:4px"><button class="btn ghost" onclick="copyPrompt('${p.id}',this)">Copy</button>${acts(`editPrompt('${p.id}')`)}</span></div><pre class="prompt" id="pb_${p.id}">${esc(p.body)}</pre></div>`).join('')}</div>`:emptyMsg('No prompts yet.');return html}
+
+/* ================= DATA ================= */
+function renderData(){const dates=[...new Set(S.sessions.map(s=>s.date))].sort().reverse();
+  let html=secHead('Data &amp; export','');
+  html+=`<div class="grid g2"><div class="card"><h3>Where your data lives</h3><p style="font-size:13px;margin:0">This page is a read-only copy of the desk's research records. It is refreshed automatically after each morning, evening and weekly run; nothing you do here changes the records.</p>
+    <p class="lede" style="margin:8px 0 0">${S.sessions.length} sessions · ${S.history.length} history days · ${S.oil.length} oil entries · ${S.events.length} events · ${S.signals.length} signals</p></div>
+   <div class="card"><h3>Download a report</h3><p class="lede" style="margin-bottom:8px">A single HTML file for one date: that day's sessions and matrix, history row, oil log, plus the standing drivers, oil view and outlook. Open it and print to PDF from your browser.</p>
+    <div class="toolbar"><select id="repDate" style="width:auto">${dates.map(d=>`<option value="${d}">${fmtD(d)}</option>`).join('')}</select><button class="btn" onclick="downloadReport()">Download report</button></div></div>
+   <div class="card"><h3>Backup</h3><p class="lede" style="margin-bottom:8px">Download everything shown on this site as one JSON file.</p>
+    <div class="toolbar"><button class="btn ghost" onclick="exportJSON()">Export backup</button><label class="btn w" style="cursor:pointer">Import backup<input type="file" accept=".json,application/json" hidden onchange="importJSON(event)"></label></div><div id="impOut" class="lede"></div></div>
+   <div class="card w"><h3>Delete a date</h3><p class="lede" style="margin-bottom:8px">Removes every session, history row and oil entry for one date. Standing sections are kept.</p><div class="toolbar"><select id="delDate" style="width:auto">${dates.map(d=>`<option value="${d}">${fmtD(d)}</option>`).join('')}</select><button class="btn danger" onclick="deleteDate()">Delete date</button></div></div></div>`;return html}
+async function offerFile(name,text,type){const u=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+function exportJSON(){const out={type:'usdinr_master_v3',exported:new Date().toISOString(),...S};offerFile('usdinr_tracker_'+todayISO()+'.json',JSON.stringify(out,null,1),'application/json')}
+function isoFromOld(s){const t=String(s||'').toLowerCase();const y=(t.match(/(20\d{2})/)||[])[1];const mi=MON.findIndex(m=>t.includes(m.toLowerCase()));const d=(t.match(/(\d{1,2})\s*[a-z]*\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/)||[])[1];if(!y||mi<0)return null;return `${y}-${String(mi+1).padStart(2,'0')}-${String(d||1).padStart(2,'0')}`}
+function slug(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'session'}
+function convertOld(o){const r={sessions:[],history:[],events:[],prompts:[],signals:[],techlog:[],standing:null};const map={};
+  (o.log||[]).forEach(x=>{const d=isoFromOld(x.date);if(!d)return;const id=d+'_'+slug(x.session);map[id]={id,date:d,session:x.session,open:x.open,close:x.close,low:'',high:'',range:x.range,bias:x.bias,tilt:tiltOf(x.bias),conf:num(x.conf),factors:[]};if(x.range){const m=String(x.range).match(/(\d{2,3}\.\d+)\s*[-–]\s*(\d{2,3}\.\d+)/);if(m){map[id].low=m[1];map[id].high=m[2]}}});
+  (o.matrices||[]).forEach(m=>{const d=isoFromOld(m.date);if(!d)return;const id=d+'_'+slug(m.session);const s=map[id]||(map[id]={id,date:d,session:m.session,tilt:tiltOf(m.net),factors:[]});s.net=m.net;s.factors=(m.rows||[]).map(x=>({f:x.f,lv:x.lv,ef:x.ef,d:x.d,src:x.sc?(typeof x.sc==='string'?x.sc:x.sc.l):'',url:x.sc&&typeof x.sc==='object'&&x.sc.u!=='#'?x.sc.u:''}))});
+  r.sessions=Object.values(map);
+  (o.history||[]).forEach(h=>{const d=isoFromOld(h.date);if(d)r.history.push({id:d,date:d,usdinr_o:h.uio,usdinr_c:h.uic,brent_o:h.bro,brent_c:h.brc,wti_o:h.wtio,wti_c:h.wtic,dxy_o:h.dxyo,dxy_c:h.dxyc})});
+  (o.upcoming||[]).forEach(u=>r.events.push({id:'ev_'+slug(u.date+'-'+u.event),date:u.date,sort:isoFromOld(u.date)||'',event:u.event,note:u.note,done:!!u.done,area:/rbi|india/i.test(u.event)?'India':/opec|oil|brent/i.test(u.event)?'Oil':'US',impact:'High'}));
+  (o.prompts||[]).forEach((p,i)=>r.prompts.push({id:p.id||'p'+i,title:p.title,when:p.when,body:p.body,order:i+1}));
+  (o.signals||[]).forEach((s,i)=>r.signals.push({...s,id:'sig_'+slug(s.date)+'_'+i,score:Math.round(s.score)}));
+  (o.techLog||[]).forEach((t,i)=>r.techlog.push({...t,id:'tl_'+slug(t.date)+'_'+i}));
+  if(o.drivers||o.timeline)r.standing={...(S.standing||{}),driversNote:o.driversNote,drivers:(o.drivers||[]).map(x=>({...x,tilt:tiltOf(x.bias),weight:5})),timeline:o.timeline?{short:o.timeline.short,medium:o.timeline.medium,long:o.timeline.long,read:o.timeline.read}:(S.standing||{}).timeline};
+  if(o.indicators)r.indicators={vals:o.indicators};return r}
+async function importJSON(e){const f=e.target.files[0];e.target.value='';if(!f)return;const out=$('#impOut');out.textContent='Reading…';
+  let o;try{o=JSON.parse(await f.text())}catch(err){out.textContent='That file is not valid JSON.';return}
+  const data=o.type==='usdinr_master_v3'?o:(o.type==='usdinr_session'&&o.data?convertOld(o.data):convertOld(o));let n=0;
+  try{for(const c of COLLS)for(const x of (data[c]||[])){if(!x.id)continue;await save(c,x.id,x);n++}
+    if(data.standing)await saveDoc('standing',data.standing);if(data.indexes)await saveDoc('indexes',data.indexes);if(data.indicators)await saveDoc('indicators',data.indicators);
+    out.textContent=`Imported ${n} records${data.standing?' plus standing drivers/outlook':''}.`}catch(err){out.textContent=`Stopped after ${n} records.`}}
+function deleteDate(){const d=$('#delDate').value;if(!d)return;const hits=[...S.sessions.filter(x=>x.date===d).map(x=>['sessions',x.id]),...S.history.filter(x=>x.date===d).map(x=>['history',x.id]),...S.oil.filter(x=>x.date===d).map(x=>['oil',x.id])];
+  confirmBox('Delete '+fmtD(d),`This removes ${hits.length} record(s) dated ${fmtD(d)} for everyone. It cannot be undone — export a backup first if unsure.`,'Delete '+hits.length+' records',async()=>{for(const [c,id] of hits)await del(c,id)})}
+function downloadReport(){const d=$('#repDate').value;if(!d)return toast('No dated sessions yet.');const st=S.standing||{},o=st.oil||{},tl=st.timeline||{};
+  const ss=sessionsSorted().filter(s=>s.date===d),hr=S.history.find(h=>h.date===d),oil=S.oil.filter(x=>x.date===d);
+  const col=t=>({usd:'#b3261e',inr:'#1d7446',neutral:'#8a6100'})[t];const P=(t,k)=>`<span style="color:${col(k||tiltOf(t))};font-weight:600">${esc(t)}</span>`;
+  const T=(head,rows)=>`<table><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table>`;
+  let b=`<h1>USD/INR Master Tracker — ${fmtD(d)}</h1><p class="m">Generated ${new Date().toLocaleString()} · ${S.indexes&&S.indexes.asof?'Index levels as of '+esc(S.indexes.asof):''}</p>`;
+  ss.forEach(s=>{b+=`<h2>${esc(s.session)} — ${P(s.bias||TLAB[s.tilt],tiltOf(s.tilt||s.bias))}</h2><p>Open ${esc(s.open||'—')} · Close ${esc(s.close||'—')} · Range ${esc([s.low,s.high].filter(Boolean).join('–')||'—')} · Support ${esc(s.supports||'—')} · Resistance ${esc(s.resistances||'—')} · Confidence ${esc(s.conf??'—')}/10</p>`+T(['#','Factor','Level','Effect on INR','Source','Details'],(s.factors||[]).map((f,i)=>[i+1,'<b>'+esc(f.f)+'</b>',esc(f.lv),P(f.ef),esc(f.src||''),esc(f.d)]))+(s.net?`<p class="n">${esc(s.net)}</p>`:'')});
+  if(hr)b+=`<h2>Closes</h2>`+T(['USD/INR','Brent','WTI','DXY','US10Y','IN10Y','Gold'],[[hr.usdinr_c,hr.brent_c,hr.wti_c,hr.dxy_c,hr.us10y,hr.in10y,hr.gold].map(x=>esc(x||'—'))]);
+  b+=`<h2>Oil market</h2>${o.view?`<p class="n">${esc(o.view)}</p>`:''}`+(oil.length?T(['Category','Headline','Crude','Brent','Read-through'],oil.map(x=>[esc(x.cat),'<b>'+esc(x.headline)+'</b>',esc(x.move),esc(x.brent||''),esc(x.detail||'')])):'')+((o.supply||[]).length?T(['Item','Status','Detail'],o.supply.map(x=>[esc(x.item),esc(x.status),esc(x.detail)])):'');
+  b+=`<h2>Drivers</h2>${st.driversNote?`<p>${esc(st.driversNote)}</p>`:''}`+T(['#','Driver','Bias','Analysis'],(st.drivers||[]).map((x,i)=>[i+1,'<b>'+esc(x.driver)+'</b>',P(x.bias,tiltOf(x.tilt||x.bias)),esc(x.analysis)]));
+  b+=`<h2>Outlook &amp; ranges</h2>`+HZ.map(([k,l])=>`<h3>${l}</h3>`+T(['Scenario','Prob.','Range','Triggers'],(tl[k]||[]).map(r=>['<b>'+esc(r.s)+'</b>',esc(r.p),esc(r.r),esc(r.t)]))).join('')+(tl.read?`<p class="n">${esc(tl.read)}</p>`:'');
+  const pend=S.events.filter(e=>!e.done);if(pend.length)b+=`<h2>Upcoming</h2>`+T(['Date','Event','Note'],pend.map(e=>[esc(e.date),'<b>'+esc(e.event)+'</b>',esc(e.note||'')]));
+  b+=`<p class="m">Research record, not financial advice. Red = rupee weaker, green = rupee firmer.</p>`;
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>USD/INR report ${d}</title><style>body{font:13px/1.5 system-ui,sans-serif;color:#15211f;max-width:1000px;margin:24px auto;padding:0 16px}h1{font-size:22px}h2{font-size:16px;border-bottom:1px solid #15211f;padding-bottom:4px;margin-top:24px}h3{font-size:13px}table{width:100%;border-collapse:collapse;margin:6px 0}th,td{border:1px solid #d6ddd8;padding:5px 7px;text-align:left;vertical-align:top}th{background:#eef1ee;font-size:11px;text-transform:uppercase}.n{border-left:3px solid #0b5d6e;background:#eef5f6;padding:8px 12px}.m{color:#5b6a66;font-size:11.5px}tr{break-inside:avoid}</style></head><body>${b}</body></html>`;
+  offerFile('usdinr_report_'+d+'.html',html,'text/html')}
+
+/* ================= render ================= */
+const R={overview:renderOverview,sessions:renderSessions,oil:renderOil,indexes:renderIndexes,drivers:renderDrivers,outlook:renderOutlook,calendar:renderCalendar,history:renderHistory,signal:renderSignal,technical:renderTechnical,prompts:renderPrompts,data:renderData};
+function render(){
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===TAB));
+  document.querySelectorAll('section.tab').forEach(s=>s.classList.toggle('show',s.id==='t-'+TAB));
+  renderStrip();
+  const host=document.getElementById('t-'+TAB);
+  const ae=document.activeElement&&host.contains(document.activeElement)&&document.activeElement.id;
+  const kept={};KEEP.forEach(id=>{const el=host.querySelector('#'+id);if(el)kept[id]=el.value});
+  host.innerHTML=R[TAB]();
+  Object.entries(kept).forEach(([id,v])=>{const el=host.querySelector('#'+id);if(el)el.value=v});
+  const ao=host.querySelector('#askOut');if(ao)ao.textContent=ASKTXT;
+  if(TAB==='signal')computeSignal();if(TAB==='oil')calcOil();
+  drawCharts();if(ae){const el=document.getElementById(ae);if(el)el.focus()}
+  const st=S.status;const mt=st&&st.lastRun?`Auto-updated ${st.lastRun} · ${st.kind||''} run`:MODE==='db'?'Shared store · syncs across devices':MODE==='local'?'This browser only':'Connecting…';
+  if(MODE!=='error')$('#modeText').textContent=MODE==='init'?'Loading…':mt+(PUB?' · published '+PUB:'');$('#modeDot').classList.toggle('on',MODE==='static')}
+const KEEP=['askQ','ocD','ocM','ocG','ocS','indDate','repDate','delDate','sessF'];let ASKTXT='';
+
+/* ================= boot (static site) ================= */
+CAN=false;document.body.classList.add('ro','noask');
+let _sig='';
+async function loadData(first){
+  try{
+    let d=window.__DATA__;
+    if(!d){const r=await fetch('data.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);d=await r.json()}
+    const sig=(d.published||'')+'|'+((d.status&&d.status.lastRun)||'');
+    if(sig===_sig)return;_sig=sig;
+    Object.keys(S).forEach(k=>{if(d[k]!==undefined)S[k]=d[k]});PUB=d.published||'';MODE='static';render();
+    if(!first)toast('Updated: '+((S.status&&S.status.lastRun)||PUB));
+  }catch(e){if(first){MODE='error';$('#modeText').textContent='Could not load the data file — refresh to try again.'}}
+}
+let PUB='';
+render();loadData(true);
+if(!window.__DATA__){setInterval(()=>loadData(false),10*60*1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadData(false)})}
+</script>
+</body></html>
